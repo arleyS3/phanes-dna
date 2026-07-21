@@ -24,8 +24,8 @@ fi
 if command -v go >/dev/null 2>&1; then
     echo "🔨 Building phanes-dna from Go toolchain..."
     TMP_DIR=$(mktemp -d)
-    git clone https://github.com/arleyS3/phanes-dna.git "$TMP_DIR"
-    cd "$TMP_DIR"
+    git clone https://github.com/arleyS3/phanes-dna.git "$TMP_DIR/repo"
+    cd "$TMP_DIR/repo"
     go build -o "$INSTALL_DIR/$BINARY_NAME" ./cmd/phanes-dna
     rm -rf "$TMP_DIR"
 else
