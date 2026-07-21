@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arley/phanes-dna/internal/dna"
+	"github.com/arleyS3/phanes-dna/internal/dna"
 )
 
 func TestProjectRoundTrip(t *testing.T) {

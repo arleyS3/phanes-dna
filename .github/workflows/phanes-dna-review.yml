@@ -21,7 +21,7 @@ jobs:
 
       - name: Install Phanes DNA
         run: |
-          go install github.com/arley/phanes-dna/cmd/phanes-dna@latest || go build -o phanes-dna ./cmd/phanes-dna
+          go install github.com/arleyS3/phanes-dna/cmd/phanes-dna@latest || go build -o phanes-dna ./cmd/phanes-dna
 
       - name: Import DNA Bundle (if present)
         run: |

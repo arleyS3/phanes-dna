@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/arley/phanes-dna/internal/dna"
-	"github.com/arley/phanes-dna/internal/store"
+	"github.com/arleyS3/phanes-dna/internal/dna"
+	"github.com/arleyS3/phanes-dna/internal/store"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -17,12 +17,9 @@ func TestHandleGetProjectDNA_EmptyQuery(t *testing.T) {
 	defer st.Close()
 
 	handlers := NewDNAHandlers(st, nil, 1)
-	req := mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Name:      "get_project_dna",
-			Arguments: map[string]any{},
-		},
-	}
+	req := mcp.CallToolRequest{}
+	req.Params.Name = "get_project_dna"
+	req.Params.Arguments = map[string]any{}
 
 	res, err := handlers.HandleGetProjectDNA(context.Background(), req)
 	if err != nil {
@@ -42,11 +39,8 @@ func TestHandleReviewArchitecture_NoViolations(t *testing.T) {
 	defer st.Close()
 
 	handlers := NewDNAHandlers(st, nil, 1)
-	req := mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Name: "review_architecture",
-		},
-	}
+	req := mcp.CallToolRequest{}
+	req.Params.Name = "review_architecture"
 
 	res, err := handlers.HandleReviewArchitecture(context.Background(), req)
 	if err != nil {
@@ -74,11 +68,8 @@ func TestHandleReviewArchitecture_WithViolations(t *testing.T) {
 	})
 
 	handlers := NewDNAHandlers(st, nil, 1)
-	req := mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Name: "review_architecture",
-		},
-	}
+	req := mcp.CallToolRequest{}
+	req.Params.Name = "review_architecture"
 
 	res, err := handlers.HandleReviewArchitecture(ctx, req)
 	if err != nil {

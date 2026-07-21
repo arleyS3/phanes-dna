@@ -9,7 +9,7 @@ import (
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/smacker/go-tree-sitter/java"
 
-	"github.com/arley/phanes-dna/internal/dna"
+	"github.com/arleyS3/phanes-dna/internal/dna"
 )
 
 type JavaAnalyzer struct{}

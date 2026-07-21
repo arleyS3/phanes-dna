@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/arley/phanes-dna/internal/ai"
+	"github.com/arleyS3/phanes-dna/internal/ai"
 )
 
 // GenerateConventionalCommit inspects the current Git branch and staged diff,

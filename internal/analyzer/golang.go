@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/arley/phanes-dna/internal/dna"
+	"github.com/arleyS3/phanes-dna/internal/dna"
 )
 
 type GoAnalyzer struct{}

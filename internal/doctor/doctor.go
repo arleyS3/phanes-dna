@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/arley/phanes-dna/internal/ai"
-	"github.com/arley/phanes-dna/internal/store"
+	"github.com/arleyS3/phanes-dna/internal/ai"
+	"github.com/arleyS3/phanes-dna/internal/store"
 )
 
 // RunDoctorChecks performs read-only system health checks.

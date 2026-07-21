@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/arley/phanes-dna/internal/ai"
-	"github.com/arley/phanes-dna/internal/dna"
-	"github.com/arley/phanes-dna/internal/store"
+	"github.com/arleyS3/phanes-dna/internal/ai"
+	"github.com/arleyS3/phanes-dna/internal/dna"
+	"github.com/arleyS3/phanes-dna/internal/store"
 )
 
 // GenerateOnboardingGuide acts as a Dev Onboarding Mentor, analyzing codebase structure,

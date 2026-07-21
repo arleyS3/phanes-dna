@@ -5,7 +5,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/arley/phanes-dna/internal/dna"
+	"github.com/arleyS3/phanes-dna/internal/dna"
 )
 
 // SearchSimilar performs brute-force cosine similarity search over all chunks

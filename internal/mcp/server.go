@@ -1,8 +1,8 @@
 package mcp
 
 import (
-	"github.com/arley/phanes-dna/internal/ai"
-	"github.com/arley/phanes-dna/internal/store"
+	"github.com/arleyS3/phanes-dna/internal/ai"
+	"github.com/arleyS3/phanes-dna/internal/store"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/arley/phanes-dna/internal/ai"
+	"github.com/arleyS3/phanes-dna/internal/ai"
 )
 
 type MenuOption struct {

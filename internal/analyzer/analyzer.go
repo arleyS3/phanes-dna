@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/arley/phanes-dna/internal/dna"
+	"github.com/arleyS3/phanes-dna/internal/dna"
 )
 
 // Analyzer parses source files for a specific language stack.

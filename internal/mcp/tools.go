@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/arley/phanes-dna/internal/ai"
-	"github.com/arley/phanes-dna/internal/dna"
-	"github.com/arley/phanes-dna/internal/onboard"
-	"github.com/arley/phanes-dna/internal/store"
+	"github.com/arleyS3/phanes-dna/internal/ai"
+	"github.com/arleyS3/phanes-dna/internal/dna"
+	"github.com/arleyS3/phanes-dna/internal/onboard"
+	"github.com/arleyS3/phanes-dna/internal/store"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -26,7 +26,7 @@ func NewDNAHandlers(st *store.Store, prov ai.Provider, projectID int64) *DNAHand
 }
 
 func (h *DNAHandlers) HandleGetProjectDNA(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args, _ := request.Params.Arguments.(map[string]any)
+	args := request.Params.Arguments
 	var query string
 	if args != nil {
 		query, _ = args["query"].(string)
@@ -84,7 +84,7 @@ func (h *DNAHandlers) HandleReviewArchitecture(ctx context.Context, request mcp.
 }
 
 func (h *DNAHandlers) HandleDevOnboarding(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args, _ := request.Params.Arguments.(map[string]any)
+	args := request.Params.Arguments
 	var topic string
 	if args != nil {
 		topic, _ = args["topic"].(string)
