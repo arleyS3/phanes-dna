@@ -2,7 +2,7 @@
 set -e
 
 # Phanes DNA Installer Script for macOS and Linux
-# Usage: curl -fsSL https://raw.githubusercontent.com/arley/phanes-dna/main/scripts/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/arleyS3/phanes-dna/main/scripts/install.sh | bash
 
 INSTALL_DIR="$HOME/.phanes-dna/bin"
 BINARY_NAME="phanes-dna"
@@ -13,9 +13,9 @@ mkdir -p "$INSTALL_DIR"
 
 if command -v go >/dev/null 2>&1; then
     echo "🔨 Building phanes-dna from Go toolchain..."
-    go install github.com/arley/phanes-dna/cmd/phanes-dna@latest || (
+    go install github.com/arleyS3/phanes-dna/cmd/phanes-dna@latest || (
         TMP_DIR=$(mktemp -d)
-        git clone https://github.com/arley/phanes-dna.git "$TMP_DIR"
+        git clone https://github.com/arleyS3/phanes-dna.git "$TMP_DIR"
         cd "$TMP_DIR"
         go build -o "$INSTALL_DIR/$BINARY_NAME" ./cmd/phanes-dna
         rm -rf "$TMP_DIR"
@@ -30,7 +30,7 @@ else
     if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; fi
     if [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi
     
-    DOWNLOAD_URL="https://github.com/arley/phanes-dna/releases/latest/download/phanes-dna-${OS}-${ARCH}.tar.gz"
+    DOWNLOAD_URL="https://github.com/arleyS3/phanes-dna/releases/latest/download/phanes-dna-${OS}-${ARCH}.tar.gz"
     curl -fsSL "$DOWNLOAD_URL" | tar -xz -C "$INSTALL_DIR"
 fi
 

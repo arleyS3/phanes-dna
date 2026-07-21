@@ -1,5 +1,5 @@
 # Phanes DNA Installer Script for Windows (PowerShell)
-# Usage: irm https://raw.githubusercontent.com/arley/phanes-dna/main/scripts/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/arleyS3/phanes-dna/main/scripts/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
@@ -14,7 +14,7 @@ if (-not (Test-Path $InstallDir)) {
 
 if (Get-Command "go" -ErrorAction SilentlyContinue) {
     Write-Host "🔨 Building phanes-dna using Go..." -ForegroundColor Yellow
-    go install github.com/arley/phanes-dna/cmd/phanes-dna@latest
+    go install github.com/arleyS3/phanes-dna/cmd/phanes-dna@latest
     $GoBin = "$env:GOPATH\bin\phanes-dna.exe"
     if (-not (Test-Path $GoBin)) { $GoBin = "$env:USERPROFILE\go\bin\phanes-dna.exe" }
     if (Test-Path $GoBin) {
@@ -22,7 +22,7 @@ if (Get-Command "go" -ErrorAction SilentlyContinue) {
     }
 } else {
     Write-Host "⚠️ Go not found. Downloading binary release..." -ForegroundColor Yellow
-    $DownloadUrl = "https://github.com/arley/phanes-dna/releases/latest/download/phanes-dna-windows-amd64.zip"
+    $DownloadUrl = "https://github.com/arleyS3/phanes-dna/releases/latest/download/phanes-dna-windows-amd64.zip"
     $ZipPath = "$env:TEMP\phanes-dna.zip"
     Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath
     Expand-Archive -Path $ZipPath -DestinationPath $InstallDir -Force

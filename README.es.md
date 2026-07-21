@@ -62,13 +62,13 @@
 **macOS / Linux**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/arley/phanes-dna/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/arleyS3/phanes-dna/main/scripts/install.sh | bash
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-irm https://raw.githubusercontent.com/arley/phanes-dna/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/arleyS3/phanes-dna/main/scripts/install.ps1 | iex
 ```
 
 ### Compilación e Instalación desde el Código Fuente
@@ -76,7 +76,7 @@ irm https://raw.githubusercontent.com/arley/phanes-dna/main/scripts/install.ps1 
 Requiere **Go 1.25+**:
 
 ```bash
-git clone https://github.com/arley/phanes-dna.git
+git clone https://github.com/arleyS3/phanes-dna.git
 cd phanes-dna
 go build -o phanes-dna ./cmd/phanes-dna
 ```
