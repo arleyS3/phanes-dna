@@ -20,11 +20,29 @@ elif [ -x "$HOME/.phanes-dna/bin/phanes-dna" ]; then
   PHANES_BIN="$HOME/.phanes-dna/bin/phanes-dna"
 fi
 
-echo "🔍 Running Phanes DNA architecture check..."
-$PHANES_BIN review --strict
-if [ $? -ne 0 ]; then
-  echo "🚨 Phanes DNA: Commit blocked due to architecture violations!"
-  exit 1
+# Determine staged files
+staged_files=$(git diff --cached --name-only)
+
+if [ -n "$staged_files" ]; then
+  violations_output=$($PHANES_BIN review)
+  blocked=false
+  
+  for file in $staged_files; do
+    # Search for the file in the violations output
+    if echo "$violations_output" | grep -q "Location: $file"; then
+      if [ "$blocked" = false ]; then
+        echo "🚨 Phanes DNA: Violations detected in your staged files:"
+        blocked=true
+      fi
+      # Print the violation block for this file
+      echo "$violations_output" | grep -B 1 -A 1 "Location: $file"
+    fi
+  done
+
+  if [ "$blocked" = true ]; then
+    echo "🚨 Phanes DNA: Commit blocked due to architecture/naming violations in your staged files!"
+    exit 1
+  fi
 fi
 `
 
@@ -110,7 +128,7 @@ done
 exit 0
 `
 
-// InstallHooks writes pre-commit, commit-msg, and pre-push hook scripts to gitDir/hooks.
+// InstallHooks escribe los scripts de los hooks de git (pre-commit, commit-msg, y pre-push) en la carpeta gitDir/hooks.
 func InstallHooks(gitDir string, hookType string) error {
 	hooksDir := filepath.Join(gitDir, ".git", "hooks")
 	if _, err := os.Stat(filepath.Join(gitDir, ".git")); os.IsNotExist(err) {
@@ -153,7 +171,7 @@ func InstallHooks(gitDir string, hookType string) error {
 	return nil
 }
 
-// UninstallHooks removes Phanes DNA pre-commit, commit-msg, and pre-push hooks.
+// UninstallHooks elimina los hooks físicos creados por Phanes DNA.
 func UninstallHooks(gitDir string) error {
 	hooksDir := filepath.Join(gitDir, ".git", "hooks")
 	_ = os.Remove(filepath.Join(hooksDir, "pre-commit"))
@@ -163,7 +181,7 @@ func UninstallHooks(gitDir string) error {
 	return nil
 }
 
-// ValidateCommitMessageFromFile reads a commit message from a file and validates it against PHANES_RULES.md
+// ValidateCommitMessageFromFile lee un mensaje de commit desde un archivo y lo valida contra las reglas de PHANES_RULES.md.
 func ValidateCommitMessageFromFile(msgFilePath string, rulesFilePath string) error {
 	msgBytes, err := os.ReadFile(msgFilePath)
 	if err != nil {
@@ -245,7 +263,7 @@ func ValidateCommitMessageFromFile(msgFilePath string, rulesFilePath string) err
 	return nil
 }
 
-// ValidateCommitSha checks a specific Git commit SHA message against PHANES_RULES.md
+// ValidateCommitSha valida el mensaje de un commit ya registrado por su SHA contra las convenciones en PHANES_RULES.md.
 func ValidateCommitSha(sha string, rulesFilePath string) error {
 	cmd := exec.Command("git", "log", "--format=%B", "-n", "1", sha)
 	msgBytes, err := cmd.Output()
