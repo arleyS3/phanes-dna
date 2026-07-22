@@ -1,32 +1,116 @@
 package githooks
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 const preCommitScript = `#!/bin/sh
 # Phanes DNA pre-commit hook
+# Resolve phanes-dna binary path (prioritize local dev binary)
+PHANES_BIN="phanes-dna"
+if [ -x "./phanes-dna" ]; then
+  PHANES_BIN="./phanes-dna"
+elif [ -x "$HOME/.phanes-dna/bin/phanes-dna" ]; then
+  PHANES_BIN="$HOME/.phanes-dna/bin/phanes-dna"
+fi
+
 echo "🔍 Running Phanes DNA architecture check..."
-phanes-dna review --strict
+$PHANES_BIN review --strict
 if [ $? -ne 0 ]; then
   echo "🚨 Phanes DNA: Commit blocked due to architecture violations!"
   exit 1
 fi
 `
 
-const prePushScript = `#!/bin/sh
-# Phanes DNA pre-push hook
-echo "🔍 Running Phanes DNA architecture push check..."
-phanes-dna review --strict
+const commitMsgScript = `#!/bin/sh
+# Phanes DNA commit-msg hook
+# Resolve phanes-dna binary path (prioritize local dev binary)
+PHANES_BIN="phanes-dna"
+if [ -x "./phanes-dna" ]; then
+  PHANES_BIN="./phanes-dna"
+elif [ -x "$HOME/.phanes-dna/bin/phanes-dna" ]; then
+  PHANES_BIN="$HOME/.phanes-dna/bin/phanes-dna"
+fi
+
+commit_msg_file=$1
+echo "🔍 Running Phanes DNA commit message check..."
+$PHANES_BIN review-commit "$commit_msg_file"
 if [ $? -ne 0 ]; then
-  echo "🚨 Phanes DNA: Push blocked due to architecture violations!"
+  echo "🚨 Phanes DNA: Commit blocked due to message violations!"
   exit 1
 fi
 `
 
-// InstallHooks writes pre-commit and pre-push hook scripts to gitDir/hooks.
+const prePushScript = `#!/bin/sh
+# Phanes DNA pre-push hook
+# Resolve phanes-dna binary path (prioritize local dev binary)
+PHANES_BIN="phanes-dna"
+if [ -x "./phanes-dna" ]; then
+  PHANES_BIN="./phanes-dna"
+elif [ -x "$HOME/.phanes-dna/bin/phanes-dna" ]; then
+  PHANES_BIN="$HOME/.phanes-dna/bin/phanes-dna"
+fi
+
+# Read stdin lines from Git: local_ref local_sha remote_ref remote_sha
+while read local_ref local_sha remote_ref remote_sha
+do
+  # Skip if delete branch push
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+  
+  # Determine changed files in this push
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    changed_files=$(git diff --name-only HEAD --not --remotes 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null)
+    commits=$(git rev-list HEAD --not --remotes 2>/dev/null || git rev-list -n 1 HEAD)
+  else
+    changed_files=$(git diff --name-only $remote_sha..$local_sha)
+    commits=$(git rev-list $remote_sha..$local_sha)
+  fi
+
+  # Run architecture review only if there are changed files
+  if [ -n "$changed_files" ]; then
+    violations_output=$($PHANES_BIN review)
+    blocked=false
+    
+    for file in $changed_files; do
+      # Search for the file in the violations output
+      if echo "$violations_output" | grep -q "Location: $file"; then
+        if [ "$blocked" = false ]; then
+          echo "🚨 Phanes DNA: Violations detected in your pushed files:"
+          blocked=true
+        fi
+        # Print the violation block for this file
+        echo "$violations_output" | grep -B 1 -A 1 "Location: $file"
+      fi
+    done
+
+    if [ "$blocked" = true ]; then
+      echo "🚨 Phanes DNA: Push blocked due to architecture/naming violations in your changes!"
+      exit 1
+    fi
+  fi
+
+  for commit in $commits
+  do
+    # Run commit message validation on each commit message
+    $PHANES_BIN review-commit-sha "$commit"
+    if [ $? -ne 0 ]; then
+      echo "🚨 Phanes DNA: Push blocked due to invalid commit messages!"
+      exit 1
+    fi
+  done
+done
+exit 0
+`
+
+// InstallHooks writes pre-commit, commit-msg, and pre-push hook scripts to gitDir/hooks.
 func InstallHooks(gitDir string, hookType string) error {
 	hooksDir := filepath.Join(gitDir, ".git", "hooks")
 	if _, err := os.Stat(filepath.Join(gitDir, ".git")); os.IsNotExist(err) {
@@ -50,6 +134,14 @@ func InstallHooks(gitDir string, hookType string) error {
 		fmt.Printf("  ✅ Installed Git hook -> %s\n", p)
 	}
 
+	if hookType == "all" || hookType == "commit-msg" || hookType == "" {
+		p := filepath.Join(hooksDir, "commit-msg")
+		if err := os.WriteFile(p, []byte(commitMsgScript), 0755); err != nil {
+			return fmt.Errorf("write commit-msg hook: %w", err)
+		}
+		fmt.Printf("  ✅ Installed Git hook -> %s\n", p)
+	}
+
 	if hookType == "all" || hookType == "pre-push" || hookType == "" {
 		p := filepath.Join(hooksDir, "pre-push")
 		if err := os.WriteFile(p, []byte(prePushScript), 0755); err != nil {
@@ -61,11 +153,117 @@ func InstallHooks(gitDir string, hookType string) error {
 	return nil
 }
 
-// UninstallHooks removes Phanes DNA pre-commit and pre-push hooks.
+// UninstallHooks removes Phanes DNA pre-commit, commit-msg, and pre-push hooks.
 func UninstallHooks(gitDir string) error {
 	hooksDir := filepath.Join(gitDir, ".git", "hooks")
 	_ = os.Remove(filepath.Join(hooksDir, "pre-commit"))
+	_ = os.Remove(filepath.Join(hooksDir, "commit-msg"))
 	_ = os.Remove(filepath.Join(hooksDir, "pre-push"))
 	fmt.Println("  🗑️ Removed Phanes DNA Git hooks.")
 	return nil
+}
+
+// ValidateCommitMessageFromFile reads a commit message from a file and validates it against PHANES_RULES.md
+func ValidateCommitMessageFromFile(msgFilePath string, rulesFilePath string) error {
+	msgBytes, err := os.ReadFile(msgFilePath)
+	if err != nil {
+		return fmt.Errorf("read commit message file: %w", err)
+	}
+	msg := strings.TrimSpace(string(msgBytes))
+
+	// Skip validation if it's a merge commit or a revert commit that Git automatically generates
+	if strings.HasPrefix(msg, "Merge branch") || strings.HasPrefix(msg, "Merge remote-tracking branch") || strings.HasPrefix(msg, "Revert ") {
+		return nil
+	}
+
+	// 1. Read PHANES_RULES.md to find git conventions
+	file, err := os.Open(rulesFilePath)
+	if err != nil {
+		// If PHANES_RULES.md does not exist, commit validation is skipped
+		return nil
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	inGitConventions := false
+	conventionalCommitsRequired := false
+	gitmojiRequired := false
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+
+		if strings.HasPrefix(trimmed, "## ") {
+			if strings.Contains(strings.ToLower(trimmed), "git conventions") {
+				inGitConventions = true
+			} else {
+				inGitConventions = false
+			}
+			continue
+		}
+
+		if inGitConventions && strings.HasPrefix(trimmed, "-") {
+			lowerLine := strings.ToLower(trimmed)
+			if strings.Contains(lowerLine, "conventional commits") {
+				conventionalCommitsRequired = true
+			}
+			if strings.Contains(lowerLine, "gitmoji") {
+				gitmojiRequired = true
+			}
+		}
+	}
+
+	// 2. Perform validations
+	if conventionalCommitsRequired {
+		// Regex for Conventional Commits: type(scope): description
+		re := regexp.MustCompile(`^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([a-zA-Z0-9_.-]+\))?: .+$`)
+		if !re.MatchString(msg) {
+			return fmt.Errorf("commit message does not follow Conventional Commits format (e.g., 'feat(auth): add login' or 'fix: resolve bug')")
+		}
+	}
+
+	if gitmojiRequired {
+		hasEmoji := false
+		if strings.HasPrefix(msg, ":") {
+			re := regexp.MustCompile(`^:[a-zA-Z0-9_-]+:`)
+			hasEmoji = re.MatchString(msg)
+		} else {
+			runes := []rune(msg)
+			if len(runes) > 0 {
+				r := runes[0]
+				// Basic emoji unicode ranges
+				if (r >= 0x1F300 && r <= 0x1F9FF) || (r >= 0x2600 && r <= 0x26FF) || (r >= 0x2700 && r <= 0x27BF) {
+					hasEmoji = true
+				}
+			}
+		}
+		if !hasEmoji {
+			return fmt.Errorf("commit message does not start with a Gitmoji (e.g., '✨ feat: add login' or ':sparkles: feat: add login')")
+		}
+	}
+
+	return nil
+}
+
+// ValidateCommitSha checks a specific Git commit SHA message against PHANES_RULES.md
+func ValidateCommitSha(sha string, rulesFilePath string) error {
+	cmd := exec.Command("git", "log", "--format=%B", "-n", "1", sha)
+	msgBytes, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to read commit SHA %s: %w", sha, err)
+	}
+
+	// Create a temp file to feed ValidateCommitMessageFromFile
+	tmpFile, err := os.CreateTemp("", "phanes-commit-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	if _, err := tmpFile.Write(msgBytes); err != nil {
+		return err
+	}
+
+	return ValidateCommitMessageFromFile(tmpFile.Name(), rulesFilePath)
 }
