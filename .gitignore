@@ -1,6 +1,6 @@
 # Binary executables
-phanes-dna
-phanes-dna.exe
+/phanes-dna
+/phanes-dna.exe
 *.exe
 *.dll
 *.so

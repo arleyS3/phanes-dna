@@ -41,7 +41,7 @@
 ## Capacidades Clave
 
 1. **Servidor MCP Stdio (`phanes-dna serve`)**:
-   - Expone de forma nativa las herramientas `get_project_dna` y `review_architecture` a Claude Code, Cursor, Antigravity, OpenCode y Codex.
+   - Expone de forma nativa las herramientas `get_project_dna` y `review_architecture` a Claude Code, Cursor, Antigravity, OpenCode, Amazon Q Developer, Kiro y Codex.
 2. **Motor de Compresión Caveman**:
    - Elimina cortesías, conectores y artículos innecesarios del contexto arquitectónico antes de enviarlo a los LLMs, reduciendo el costo de tokens en los prompts hasta en un 65%.
 3. **Local Cache & Sync Engine (bundles `.dna`)**:
@@ -51,7 +51,7 @@
 5. **Bot de CI para GitHub Actions**:
    - Ejecuta `phanes-dna review --ci` en Pull Requests para publicar anotaciones de errores de capa directamente en la interfaz de GitHub.
 6. **Instalador en Un Comando (`phanes-dna setup`)**:
-   - Configura automáticamente la entrada MCP stdio en los archivos de configuración de Antigravity, OpenCode, Claude Desktop y Cursor.
+   - Configura automáticamente la entrada MCP stdio en los archivos de configuración de Antigravity, OpenCode, Claude Desktop, Cursor, Amazon Q Developer y Kiro.
 
 ---
 
@@ -103,7 +103,7 @@ phanes-dna
 | `phanes-dna serve` | Inicia el servidor MCP stdio para agentes de IA |
 | `phanes-dna export [salida.dna]` | Exporta las reglas a un archivo comprimido `.dna` |
 | `phanes-dna import <archivo.dna>` | Importa un bundle `.dna` a la base de datos local |
-| `phanes-dna setup [agente]` | Autoconfigura MCP para asistentes de IA (`claude`, `cursor`, `antigravity`, `opencode`, `all`) |
+| `phanes-dna setup [agente]` | Autoconfigura MCP para asistentes de IA (`claude`, `cursor`, `antigravity`, `opencode`, `amazonq`, `kiro`, `all`) |
 | `phanes-dna hooks install` | Instala hooks de Git pre-commit y pre-push |
 | `phanes-dna doctor` | Ejecuta diagnósticos de salud del entorno y ecosistema |
 | `phanes-dna version` | Muestra la versión del binario y el proveedor de IA activo |

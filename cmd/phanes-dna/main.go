@@ -18,6 +18,7 @@ import (
 	"github.com/arleyS3/phanes-dna/internal/githooks"
 	"github.com/arleyS3/phanes-dna/internal/mcp"
 	"github.com/arleyS3/phanes-dna/internal/onboard"
+	"github.com/arleyS3/phanes-dna/internal/generator"
 	"github.com/arleyS3/phanes-dna/internal/setup"
 	"github.com/arleyS3/phanes-dna/internal/store"
 	"github.com/arleyS3/phanes-dna/internal/sync"
@@ -73,8 +74,37 @@ func main() {
 		runExport(st)
 	case "import":
 		runImport(st)
+	case "generate":
+		runGenerate()
 	case "setup":
 		runSetup()
+	case "setup-rules":
+		if err := setup.AskQuestionsAndGenerateRules(); err != nil {
+			fmt.Fprintf(os.Stderr, "Rules setup failed: %v\n", err)
+			os.Exit(1)
+		}
+	case "review-commit":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: phanes-dna review-commit <msg_file>")
+			os.Exit(1)
+		}
+		rulesPath := filepath.Join(".", "PHANES_RULES.md")
+		if err := githooks.ValidateCommitMessageFromFile(os.Args[2], rulesPath); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Phanes DNA: Commit validation error: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	case "review-commit-sha":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: phanes-dna review-commit-sha <sha>")
+			os.Exit(1)
+		}
+		rulesPath := filepath.Join(".", "PHANES_RULES.md")
+		if err := githooks.ValidateCommitSha(os.Args[2], rulesPath); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ Phanes DNA: Commit validation error on SHA %s: %v\n", os.Args[2], err)
+			os.Exit(1)
+		}
+		os.Exit(0)
 	case "hooks":
 		runHooks()
 	case "commit":
@@ -105,9 +135,10 @@ func printUsage() {
 	fmt.Println("  phanes-dna review [--strict] [--ci] Run architecture compliance review")
 	fmt.Println("  phanes-dna onboard [topic]   Dev Onboarding Mentor: ask how to build features & conventions")
 	fmt.Println("  phanes-dna commit [--lang]   Generate Conventional Commit from branch & staged diff")
+	fmt.Println("  phanes-dna generate <name>   Generate feature scaffolding files according to PHANES_RULES.md")
 	fmt.Println("  phanes-dna export [out.dna]  Export rules to ultralight .dna bundle")
 	fmt.Println("  phanes-dna import <file.dna> Import shared .dna bundle into local store")
-	fmt.Println("  phanes-dna setup [agent]     Install MCP stdio entry for target agent")
+	fmt.Println("  phanes-dna setup [agent|rules] Install MCP config for agent, or run rules setup questionnaire")
 	fmt.Println("  phanes-dna hooks [install|uninstall] [type] Manage Git pre-commit & pre-push hooks")
 	fmt.Println("  phanes-dna doctor            Execute environment health & ecosystem diagnostics")
 	fmt.Println("  phanes-dna version           Show binary version")
@@ -320,6 +351,14 @@ func runSetup() {
 		target = os.Args[2]
 	}
 
+	if target == "rules" {
+		if err := setup.AskQuestionsAndGenerateRules(); err != nil {
+			fmt.Fprintf(os.Stderr, "Rules setup failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	fmt.Printf("⚙️ Setting up Phanes DNA MCP stdio server for target '%s'...\n", target)
 	if err := setup.InstallMCPConfig(target); err != nil {
 		fmt.Fprintf(os.Stderr, "Setup failed: %v\n", err)
@@ -374,4 +413,17 @@ func runCommit(prov ai.Provider) {
 	}
 
 	fmt.Printf("💡 Generated Conventional Commit:\n   \033[1;32m%s\033[0m\n", commitMsg)
+}
+
+func runGenerate() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: phanes-dna generate <feature_name>")
+		os.Exit(1)
+	}
+
+	featureName := os.Args[2]
+	if err := generator.GenerateScaffolding(featureName); err != nil {
+		fmt.Fprintf(os.Stderr, "Scaffolding generation failed: %v\n", err)
+		os.Exit(1)
+	}
 }
