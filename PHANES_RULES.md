@@ -6,7 +6,8 @@
 
 ## 2. Code Conventions (LLM Evaluated)
 <!-- Guidelines for code styling and comments -->
-- Inline comments can be in Spanish, but code symbols (classes, functions) must be in English.
+- Toda la documentación del código (docstrings) y comentarios de funciones o estructuras deben ser exclusivamente en español.
+- Los símbolos del código (funciones, structs, variables) deben escribirse en inglés, pero su documentación explicativa en la línea anterior debe estar en español y seguir buenas prácticas.
 - Return clean error contexts instead of panic statements.
 
 ## 3. Git Conventions (LLM Evaluated)
