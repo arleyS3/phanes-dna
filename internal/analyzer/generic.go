@@ -71,6 +71,16 @@ func (a *GenericAnalyzer) AnalyzeFile(path string) (*dna.SourceFile, error) {
 		sf.Layers = append(sf.Layers, "service")
 	} else if strings.Contains(lowerPath, "repository") || strings.Contains(lowerPath, "models") || strings.Contains(lowerPath, "db") {
 		sf.Layers = append(sf.Layers, "repository")
+	} else if strings.Contains(lowerPath, "component") {
+		sf.Layers = append(sf.Layers, "component")
+	} else if strings.Contains(lowerPath, "hook") {
+		sf.Layers = append(sf.Layers, "hook")
+	} else if strings.Contains(lowerPath, "page") || strings.Contains(lowerPath, "screen") || strings.Contains(lowerPath, "app/") || strings.Contains(lowerPath, "pages/") {
+		sf.Layers = append(sf.Layers, "page")
+	} else if strings.Contains(lowerPath, "context") || strings.Contains(lowerPath, "store") || strings.Contains(lowerPath, "state") {
+		sf.Layers = append(sf.Layers, "state")
+	} else if strings.Contains(lowerPath, "module") {
+		sf.Layers = append(sf.Layers, "module")
 	} else {
 		sf.Layers = append(sf.Layers, "utility")
 	}

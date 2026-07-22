@@ -21,7 +21,6 @@ import (
 	"github.com/arleyS3/phanes-dna/internal/generator"
 	"github.com/arleyS3/phanes-dna/internal/setup"
 	"github.com/arleyS3/phanes-dna/internal/store"
-	"github.com/arleyS3/phanes-dna/internal/sync"
 	"github.com/arleyS3/phanes-dna/internal/tui"
 )
 
@@ -70,10 +69,6 @@ func main() {
 	case "onboard":
 		prov, _, _ := ai.AutoDetectProvider(ai.Config{})
 		runOnboard(st, prov)
-	case "export":
-		runExport(st)
-	case "import":
-		runImport(st)
 	case "generate":
 		runGenerate()
 	case "setup":
@@ -136,8 +131,6 @@ func printUsage() {
 	fmt.Println("  phanes-dna onboard [topic]   Dev Onboarding Mentor: ask how to build features & conventions")
 	fmt.Println("  phanes-dna commit [--lang]   Generate Conventional Commit from branch & staged diff")
 	fmt.Println("  phanes-dna generate <name>   Generate feature scaffolding files according to PHANES_RULES.md")
-	fmt.Println("  phanes-dna export [out.dna]  Export rules to ultralight .dna bundle")
-	fmt.Println("  phanes-dna import <file.dna> Import shared .dna bundle into local store")
 	fmt.Println("  phanes-dna setup [agent|rules] Install MCP config for agent, or run rules setup questionnaire")
 	fmt.Println("  phanes-dna hooks [install|uninstall] [type] Manage Git pre-commit & pre-push hooks")
 	fmt.Println("  phanes-dna doctor            Execute environment health & ecosystem diagnostics")
@@ -305,45 +298,7 @@ func runOnboard(st *store.Store, prov ai.Provider) {
 	fmt.Println("\n" + guide)
 }
 
-func runExport(st *store.Store) {
-	outPath := "project.dna"
-	if len(os.Args) > 2 {
-		outPath = os.Args[2]
-	}
 
-	ctx := context.Background()
-	projects, err := st.ListProjects(ctx)
-	var projID int64 = 1
-	if err == nil && len(projects) > 0 {
-		projID = projects[0].ID
-	}
-
-	if err := sync.ExportBundle(ctx, st, projID, outPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Export failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("📦 Successfully exported ultralight sync bundle to '%s'.\n", outPath)
-}
-
-func runImport(st *store.Store) {
-	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "Usage: phanes-dna import <file.dna>")
-		os.Exit(1)
-	}
-
-	inPath := os.Args[2]
-	ctx := context.Background()
-
-	bundle, err := sync.ImportBundle(ctx, st, inPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Import failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("✅ Successfully imported .dna bundle for project '%s' (%d layer rules, %d violations synced).\n",
-		bundle.ProjectName, len(bundle.LayerRules), len(bundle.Violations))
-}
 
 func runSetup() {
 	target := "all"

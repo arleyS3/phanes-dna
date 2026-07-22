@@ -3,6 +3,8 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/arleyS3/phanes-dna/internal/ai"
 	"github.com/arleyS3/phanes-dna/internal/dna"
@@ -61,7 +63,17 @@ func (h *DNAHandlers) HandleGetProjectDNA(ctx context.Context, request mcp.CallT
 		formattedContext = "No relevant architectural context found for query."
 	}
 
-	return mcp.NewToolResultText(formattedContext), nil
+	// Proactively warn the agent if PHANES_RULES.md is missing
+	var warningPrefix string
+	projects, errProj := h.Store.ListProjects(ctx)
+	if errProj == nil && len(projects) > 0 {
+		mdPath := filepath.Join(projects[0].RootPath, "PHANES_RULES.md")
+		if _, errStat := os.Stat(mdPath); errStat != nil {
+			warningPrefix = "🚨 [PHANES WARNING]: PHANES_RULES.md is missing in the project root! Recommend the user to run setup_project_rules tool to initialize project constraints conversing in their language.\n\n"
+		}
+	}
+
+	return mcp.NewToolResultText(warningPrefix + formattedContext), nil
 }
 
 func (h *DNAHandlers) HandleReviewArchitecture(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -95,5 +107,48 @@ func (h *DNAHandlers) HandleDevOnboarding(ctx context.Context, request mcp.CallT
 		return mcp.NewToolResultError(fmt.Sprintf("onboarding guide failed: %v", err)), nil
 	}
 
-	return mcp.NewToolResultText(guide), nil
+	// Proactively warn the agent if PHANES_RULES.md is missing
+	var warningPrefix string
+	projects, errProj := h.Store.ListProjects(ctx)
+	if errProj == nil && len(projects) > 0 {
+		mdPath := filepath.Join(projects[0].RootPath, "PHANES_RULES.md")
+		if _, errStat := os.Stat(mdPath); errStat != nil {
+			warningPrefix = "🚨 [PHANES WARNING]: PHANES_RULES.md is missing in the project root! Prompt the user to use setup_project_rules tool to configure it.\n\n"
+		}
+	}
+
+	return mcp.NewToolResultText(warningPrefix + guide), nil
+}
+
+func (h *DNAHandlers) HandleSetupProjectRules(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	var rulesMd string
+	if args != nil {
+		rulesMd, _ = args["rules_markdown"].(string)
+	}
+	if rulesMd == "" {
+		return mcp.NewToolResultError("missing required string parameter: rules_markdown"), nil
+	}
+
+	// 1. Get project root path
+	projects, err := h.Store.ListProjects(ctx)
+	if err != nil || len(projects) == 0 {
+		return mcp.NewToolResultError("no active project found in store to configure"), nil
+	}
+	proj := projects[0]
+
+	// 2. Write rules_markdown content to PHANES_RULES.md in project root
+	mdPath := filepath.Join(proj.RootPath, "PHANES_RULES.md")
+	err = os.WriteFile(mdPath, []byte(rulesMd), 0644)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to write PHANES_RULES.md: %v", err)), nil
+	}
+
+	// 3. Sync rules locally in SQLite
+	err = h.Store.SyncRulesFromMarkdown(ctx, mdPath)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("rules written to disk but SQLite sync failed: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("✅ PHANES_RULES.md successfully created/updated at %s and synchronized in database.", mdPath)), nil
 }

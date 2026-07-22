@@ -49,12 +49,26 @@ chmod +x "$INSTALL_DIR/$BINARY_NAME"
 # Check PATH
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo "📝 Adding $INSTALL_DIR to PATH..."
+    
+    # Support Fish shell
+    if [ -d "$HOME/.config/fish" ] || [[ "$SHELL" == *"fish"* ]]; then
+        mkdir -p "$HOME/.config/fish"
+        if ! grep -q "phanes-dna/bin" "$HOME/.config/fish/config.fish" 2>/dev/null; then
+            echo 'fish_add_path $HOME/.phanes-dna/bin' >> "$HOME/.config/fish/config.fish"
+            echo "  Added to Fish config.fish"
+        fi
+    fi
+
+    # Support Bash/Zsh
     SHELL_PROFILE="$HOME/.bashrc"
     if [ -n "$ZSH_VERSION" ] || [ -f "$HOME/.zshrc" ]; then
         SHELL_PROFILE="$HOME/.zshrc"
     fi
-    echo "" >> "$SHELL_PROFILE"
-    echo 'export PATH="$HOME/.phanes-dna/bin:$PATH"' >> "$SHELL_PROFILE"
+    if ! grep -q "phanes-dna/bin" "$SHELL_PROFILE" 2>/dev/null; then
+        echo "" >> "$SHELL_PROFILE"
+        echo 'export PATH="$HOME/.phanes-dna/bin:$PATH"' >> "$SHELL_PROFILE"
+        echo "  Added to $SHELL_PROFILE"
+    fi
 fi
 
 echo "✅ Phanes DNA installed successfully to $INSTALL_DIR/$BINARY_NAME!"

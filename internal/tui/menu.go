@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/arleyS3/phanes-dna/internal/ai"
+	"github.com/arleyS3/phanes-dna/internal/dna"
+	"github.com/charmbracelet/huh"
 )
 
 type MenuOption struct {
@@ -16,48 +17,81 @@ type MenuOption struct {
 	ActionKey   string
 }
 
-// RunInteractiveMenu presents an interactive CLI interface similar to Gentle-AI.
+var menuTranslations = map[string]map[string]string{
+	"es": {
+		"title": "🧬 Phanes DNA — CLI de Arquitecto de Software Residente",
+		"select": "Seleccione una acción a ejecutar",
+		"analyze": "Analizar Proyecto — Escanea e indexa archivos fuente",
+		"review": "Revisar Arquitectura — Audita el cumplimiento de capas",
+		"commit": "Smart Git Commit — Genera conventional commit con IA",
+		"config-ai": "Configurar Proveedor de IA — Establece API Keys/Ollama URL",
+		"setup": "Configurar MCP para Agentes de IA — Instala en editores",
+		"setup-rules": "Configurar Reglas del Proyecto — Define PHANES_RULES.md",
+		"export": "Exportar Paquete de Sincronización (.dna) — Exporta a bundle",
+		"import": "Importar Paquete de Sincronización (.dna) — Importa a la DB",
+		"hooks": "Instalar Git Hooks — Instala bloqueadores de arquitectura",
+		"doctor": "Ejecutar Doctor — Diagnósticos de salud del ecosistema",
+		"exit": "Salir — Cerrar CLI de Phanes DNA",
+	},
+	"en": {
+		"title": "🧬 Phanes DNA — Resident Software Architect CLI",
+		"select": "Select an action to execute",
+		"analyze": "Analyze Project — Scan & index source files",
+		"review": "Review Architecture — Audit layer compliance",
+		"commit": "Smart Git Commit — Generate conventional commit",
+		"config-ai": "Configure AI Provider — Set API Keys/Ollama URL",
+		"setup": "Setup MCP for AI Agents — Install into editors",
+		"setup-rules": "Setup Project Rules — Define PHANES_RULES.md",
+		"export": "Export Sync Bundle (.dna) — Export rules to bundle",
+		"import": "Import Sync Bundle (.dna) — Import rules to store",
+		"hooks": "Install Git Hooks — Install architecture gates",
+		"doctor": "Run Doctor — Execute health check diagnostics",
+		"exit": "Exit — Close Phanes DNA CLI",
+	},
+}
+
+// RunInteractiveMenu presents an interactive CLI interface with arrow navigation using Huh.
 func RunInteractiveMenu() string {
-	fmt.Println("\n🧬 Phanes DNA — Resident Software Architect CLI")
+	var choice string
+
+	lang := dna.DetectLanguage()
+	t := menuTranslations[lang]
+
+	fmt.Println("\n" + t["title"])
 	fmt.Println("==================================================")
-	fmt.Println("Select an action to execute:")
-	fmt.Println()
 
-	options := []MenuOption{
-		{"Analyze Project", "Scan & index multi-stack source files into SQLite", "analyze"},
-		{"Review Architecture", "Audit layer rules & compliance", "review"},
-		{"Dev Onboarding Mentor", "Ask how features or conventions are built in this project", "onboard"},
-		{"Smart Git Commit", "Generate Conventional Commit from branch & staged diff", "commit"},
-		{"Configure AI Provider", "Interactively set Ollama URL, Gemini API Key, or Anthropic Key", "config-ai"},
-		{"Setup MCP for AI Agents", "Configure MCP stdio server in Cursor/Claude/Antigravity/OpenCode", "setup"},
-		{"Export Sync Bundle (.dna)", "Export project rules to ultralight .dna bundle", "export"},
-		{"Import Sync Bundle (.dna)", "Import .dna sync bundle into local store", "import"},
-		{"Install Git Hooks", "Install pre-commit & pre-push architecture gates", "hooks"},
-		{"Run Doctor", "Execute ecosystem health & environment diagnostics", "doctor"},
-		{"Exit", "Close Phanes DNA CLI", "exit"},
-	}
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title(t["select"]).
+				Options(
+					huh.NewOption(t["analyze"], "analyze"),
+					huh.NewOption(t["review"], "review"),
+					huh.NewOption(t["commit"], "commit"),
+					huh.NewOption(t["config-ai"], "config-ai"),
+					huh.NewOption(t["setup"], "setup"),
+					huh.NewOption(t["setup-rules"], "setup-rules"),
+					huh.NewOption(t["export"], "export"),
+					huh.NewOption(t["import"], "import"),
+					huh.NewOption(t["hooks"], "hooks"),
+					huh.NewOption(t["doctor"], "doctor"),
+					huh.NewOption(t["exit"], "exit"),
+				).
+				Value(&choice),
+		),
+	)
 
-	for i, opt := range options {
-		fmt.Printf("  [%d] %-28s — %s\n", i+1, opt.Title, opt.Description)
-	}
-	fmt.Println()
-	fmt.Print("Enter choice [1-11]: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-
-	choice, err := strconv.Atoi(input)
-	if err != nil || choice < 1 || choice > len(options) {
+	err := form.Run()
+	if err != nil {
 		return "exit"
 	}
 
-	if options[choice-1].ActionKey == "config-ai" {
+	if choice == "config-ai" {
 		RunConfigureAIInteractive()
 		return "exit"
 	}
 
-	return options[choice-1].ActionKey
+	return choice
 }
 
 func RunConfigureAIInteractive() {

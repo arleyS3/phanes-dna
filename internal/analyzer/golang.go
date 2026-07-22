@@ -63,12 +63,20 @@ func (a *GoAnalyzer) AnalyzeFile(path string) (*dna.SourceFile, error) {
 		sf.Layers = append(sf.Layers, "domain")
 	}
 
-	// Extract AST nodes (structs, interfaces, functions, methods)
+	// Extract AST nodes (imports, structs, interfaces, functions, methods)
 	ast.Inspect(node, func(n ast.Node) bool {
 		if n == nil {
 			return true
 		}
 		switch x := n.(type) {
+		case *ast.ImportSpec:
+			pathVal := x.Path.Value
+			importPath := strings.Trim(pathVal, "\"")
+			sf.AST = append(sf.AST, dna.ASTNode{
+				Type: "import",
+				Name: importPath,
+				Line: fset.Position(x.Pos()).Line,
+			})
 		case *ast.TypeSpec:
 			sf.AST = append(sf.AST, dna.ASTNode{
 				Type: "struct_or_interface",

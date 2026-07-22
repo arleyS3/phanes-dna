@@ -33,5 +33,12 @@ func ServeStdio(st *store.Store, prov ai.Provider, projectID int64) error {
 	)
 	s.AddTool(toolOnboard, handlers.HandleDevOnboarding)
 
+	// Tool 4: setup_project_rules
+	toolSetupRules := mcp.NewTool("setup_project_rules",
+		mcp.WithDescription("Write or update PHANES_RULES.md in the project root containing architectural dependencies and conventions, and sync rules dynamically in SQLite"),
+		mcp.WithString("rules_markdown", mcp.Required(), mcp.Description("Markdown content conforming to the PHANES_RULES.md structure")),
+	)
+	s.AddTool(toolSetupRules, handlers.HandleSetupProjectRules)
+
 	return server.ServeStdio(s)
 }
