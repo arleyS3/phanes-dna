@@ -360,6 +360,10 @@ func (s *Store) GetViolations(ctx context.Context) ([]*dna.Violation, error) {
 			if errNaming := s.AuditNamingConventions(ctx, p.ID); errNaming != nil {
 				fmt.Fprintf(os.Stderr, "  ⚠️ Naming audit failed for project %d: %v\n", p.ID, errNaming)
 			}
+
+			if errEmoji := s.AuditNoEmojisInComments(ctx, p.ID); errEmoji != nil {
+				fmt.Fprintf(os.Stderr, "  ⚠️ Emoji audit failed for project %d: %v\n", p.ID, errEmoji)
+			}
 		}
 	}
 
@@ -521,9 +525,9 @@ func (s *Store) AuditArchitecture(ctx context.Context, projectID int64) error {
 	return nil
 }
 
-// AuditNamingConventions checks if the source file names comply with naming patterns defined in PHANES_RULES.md
+// AuditNamingConventions valida si los nombres de los archivos fuente cumplen con los patrones definidos en PHANES_RULES.md.
 func (s *Store) AuditNamingConventions(ctx context.Context, projectID int64) error {
-	// 1. Get project root to locate PHANES_RULES.md
+	// 1. Obtener la ruta raíz del proyecto para ubicar PHANES_RULES.md
 	var rootPath string
 	err := s.db.QueryRowContext(ctx, "SELECT root_path FROM projects WHERE id = ?", projectID).Scan(&rootPath)
 	if err != nil {
@@ -532,11 +536,11 @@ func (s *Store) AuditNamingConventions(ctx context.Context, projectID int64) err
 
 	rulesPath := filepath.Join(rootPath, "PHANES_RULES.md")
 	if _, err := os.Stat(rulesPath); err != nil {
-		// If rules file is missing, nothing to audit
+		// Si no existe el archivo de reglas, no hay nada que auditar
 		return nil
 	}
 
-	// 2. Parse Case Style and Patterns from PHANES_RULES.md
+	// 2. Parsear el Case Style y los patrones definidos en PHANES_RULES.md
 	caseStyle, patterns, err := parseNamingRules(rulesPath)
 	if err != nil {
 		return fmt.Errorf("parse naming rules: %w", err)
@@ -546,7 +550,7 @@ func (s *Store) AuditNamingConventions(ctx context.Context, projectID int64) err
 		return nil
 	}
 
-	// 3. Get all files in project
+	// 3. Obtener todos los archivos asociados al proyecto
 	rows, err := s.db.QueryContext(ctx, "SELECT rel_path, layer FROM source_files WHERE project_id = ?", projectID)
 	if err != nil {
 		return fmt.Errorf("list source files: %w", err)
@@ -565,7 +569,7 @@ func (s *Store) AuditNamingConventions(ctx context.Context, projectID int64) err
 		}
 	}
 
-	// Helper for case regex
+	// Expresión regular auxiliar según el estilo de mayúsculas/minúsculas
 	getCaseStyleRegex := func(style string) string {
 		switch strings.ToLower(strings.ReplaceAll(style, " ", "")) {
 		case "snake_case":
@@ -581,7 +585,7 @@ func (s *Store) AuditNamingConventions(ctx context.Context, projectID int64) err
 		}
 	}
 
-	// 4. Validate each file against layer pattern
+	// 4. Validar cada archivo indexado contra el patrón de su capa
 	for _, f := range files {
 		if f.layer == "" {
 			continue
@@ -592,7 +596,7 @@ func (s *Store) AuditNamingConventions(ctx context.Context, projectID int64) err
 			continue
 		}
 
-		// Compile regex pattern
+		// Compilar el patrón de expresión regular
 		token := "__NAME_TOKEN__"
 		patternWithToken := strings.ReplaceAll(pattern, "[name]", token)
 		escapedPattern := regexp.QuoteMeta(patternWithToken)
@@ -656,6 +660,80 @@ func parseNamingRules(path string) (string, map[string]string, error) {
 	}
 
 	return caseStyle, patterns, scanner.Err()
+}
+
+// AuditNoEmojisInComments scans project source files and records violations if comments contain emojis.
+func (s *Store) AuditNoEmojisInComments(ctx context.Context, projectID int64) error {
+	// 1. Get project root
+	var rootPath string
+	err := s.db.QueryRowContext(ctx, "SELECT root_path FROM projects WHERE id = ?", projectID).Scan(&rootPath)
+	if err != nil {
+		return fmt.Errorf("get project root: %w", err)
+	}
+
+	// 2. Get all files in project
+	rows, err := s.db.QueryContext(ctx, "SELECT rel_path FROM source_files WHERE project_id = ?", projectID)
+	if err != nil {
+		return fmt.Errorf("list source files: %w", err)
+	}
+	defer rows.Close()
+
+	var relPaths []string
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err == nil {
+			relPaths = append(relPaths, path)
+		}
+	}
+
+	// Rango de emojis comunes en Unicode
+	emojiRegex := regexp.MustCompile(`[\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]`)
+
+	// 3. Inspeccionar cada archivo
+	for _, relPath := range relPaths {
+		fullPath := filepath.Join(rootPath, relPath)
+		file, err := os.Open(fullPath)
+		if err != nil {
+			continue // omitir archivos no legibles
+		}
+
+		scanner := bufio.NewScanner(file)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+			trimmed := strings.TrimSpace(line)
+
+			// Chequeo simple de delimitadores de comentarios
+			isComment := false
+			commentText := ""
+
+			if idx := strings.Index(trimmed, "//"); idx != -1 {
+				isComment = true
+				commentText = trimmed[idx+2:]
+			} else if idx := strings.Index(trimmed, "#"); idx != -1 {
+				isComment = true
+				commentText = trimmed[idx+1:]
+			} else if strings.HasPrefix(trimmed, "*") {
+				// Típico de bloques de comentarios /* ... */
+				isComment = true
+				commentText = trimmed[1:]
+			}
+
+			if isComment && emojiRegex.MatchString(commentText) {
+				recommendation := fmt.Sprintf("Los comentarios del código no deben contener emojis ni emoticones. Eliminá el emoji de la línea %d en '%s'.", lineNum, filepath.Base(relPath))
+				ruleRef := "no-emojis-in-comments"
+
+				_, _ = s.db.ExecContext(ctx,
+					`INSERT INTO violations(file, line, from_class, to_class, severity, rule_ref, recommendation)
+					 VALUES(?, ?, ?, ?, ?, ?, ?)`,
+					relPath, lineNum, "", "", "warning", ruleRef, recommendation)
+			}
+		}
+		file.Close()
+	}
+
+	return nil
 }
 
 // SyncRulesFromMarkdown reads PHANES_RULES.md from project root and populates layer_rules in SQLite.

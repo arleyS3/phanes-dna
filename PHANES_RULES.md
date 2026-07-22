@@ -8,6 +8,7 @@
 <!-- Guidelines for code styling and comments -->
 - Toda la documentación del código (docstrings) y comentarios de funciones o estructuras deben ser exclusivamente en español.
 - Los símbolos del código (funciones, structs, variables) deben escribirse en inglés, pero su documentación explicativa en la línea anterior debe estar en español y seguir buenas prácticas.
+- Los comentarios y la documentación en el código no deben contener emojis ni emoticones (como 🚀, ⚠️, 😄, etc.) bajo ninguna circunstancia.
 - Return clean error contexts instead of panic statements.
 
 ## 3. Git Conventions (LLM Evaluated)
