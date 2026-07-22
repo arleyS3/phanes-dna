@@ -13,10 +13,3 @@
 
 ## 3. Git Conventions (LLM Evaluated)
 - Commit messages must follow Conventional Commits specification.
-
-## 4. Naming & Scaffolding Conventions
-- Case Style: `snake_case`
-- Patterns:
-  - controller: `[name]_controller.go`
-  - service: `[name]_service.go`
-  - repository: `[name]_repository.go`
