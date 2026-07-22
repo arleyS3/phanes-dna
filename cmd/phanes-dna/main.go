@@ -71,6 +71,8 @@ func main() {
 		runOnboard(st, prov)
 	case "generate":
 		runGenerate()
+	case "graph":
+		runGraph(st)
 	case "setup":
 		runSetup()
 	case "setup-rules":
@@ -131,6 +133,7 @@ func printUsage() {
 	fmt.Println("  phanes-dna onboard [topic]   Dev Onboarding Mentor: ask how to build features & conventions")
 	fmt.Println("  phanes-dna commit [--lang]   Generate Conventional Commit from branch & staged diff")
 	fmt.Println("  phanes-dna generate <name>   Generate feature scaffolding files according to PHANES_RULES.md")
+	fmt.Println("  phanes-dna graph             Generate visual architecture diagram (Mermaid) in PHANES_ARCHITECTURE.md")
 	fmt.Println("  phanes-dna setup [agent|rules] Install MCP config for agent, or run rules setup questionnaire")
 	fmt.Println("  phanes-dna hooks [install|uninstall] [type] Manage Git pre-commit & pre-push hooks")
 	fmt.Println("  phanes-dna doctor            Execute environment health & ecosystem diagnostics")
@@ -381,4 +384,42 @@ func runGenerate() {
 		fmt.Fprintf(os.Stderr, "Scaffolding generation failed: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// runGraph genera y guarda el diagrama de arquitectura interactivo (Mermaid) de las dependencias.
+func runGraph(st *store.Store) {
+	ctx := context.Background()
+	absPath, err := filepath.Abs(".")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al obtener la ruta absoluta: %v\n", err)
+		os.Exit(1)
+	}
+
+	proj, err := st.GetProjectByPath(ctx, absPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: El proyecto no ha sido analizado aún. Ejecutá './phanes-dna analyze' primero.\n")
+		os.Exit(1)
+	}
+
+	mermaidStr, err := st.GenerateMermaidGraph(ctx, proj.ID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error al generar el gráfico: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Estructurar el archivo Markdown de salida
+	var mdContent strings.Builder
+	mdContent.WriteString("# 🗺️ Mapa de Arquitectura\n\n")
+	mdContent.WriteString("Este diagrama de arquitectura interactivo fue generado de forma automática por **Phanes DNA** a partir del análisis estático de las dependencias e importaciones de tu código fuente.\n\n")
+	mdContent.WriteString("```mermaid\n")
+	mdContent.WriteString(mermaidStr)
+	mdContent.WriteString("```\n")
+
+	outPath := "PHANES_ARCHITECTURE.md"
+	if err := os.WriteFile(outPath, []byte(mdContent.String()), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Error al escribir el archivo: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ Mapa de arquitectura autogenerado con éxito en '%s'.\n", outPath)
 }

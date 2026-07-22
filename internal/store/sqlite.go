@@ -89,6 +89,23 @@ func (s *Store) GetProject(ctx context.Context, id int64) (*dna.Project, error) 
 	return &p, nil
 }
 
+// GetProjectByPath busca un proyecto por su ruta raíz absoluta en SQLite.
+func (s *Store) GetProjectByPath(ctx context.Context, path string) (*dna.Project, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT id, name, root_path, analyzed_at FROM projects WHERE root_path = ? ORDER BY id DESC LIMIT 1`, path)
+	var p dna.Project
+	var analyzedAt string
+	if err := row.Scan(&p.ID, &p.Name, &p.RootPath, &analyzedAt); err != nil {
+		return nil, fmt.Errorf("get project by path %s: %w", path, err)
+	}
+	t, err := time.Parse(time.RFC3339, analyzedAt)
+	if err != nil {
+		return nil, fmt.Errorf("parse analyzed_at %q: %w", analyzedAt, err)
+	}
+	p.DetectedAt = t
+	return &p, nil
+}
+
 // ListProjects returns all stored projects.
 func (s *Store) ListProjects(ctx context.Context) ([]*dna.Project, error) {
 	rows, err := s.db.QueryContext(ctx,
@@ -704,20 +721,24 @@ func (s *Store) AuditNoEmojisInComments(ctx context.Context, projectID int64) er
 			line := scanner.Text()
 			trimmed := strings.TrimSpace(line)
 
-			// Chequeo simple de delimitadores de comentarios
+			// Chequeo simple de delimitadores de comentarios según el lenguaje
 			isComment := false
 			commentText := ""
+			ext := strings.ToLower(filepath.Ext(relPath))
 
-			if idx := strings.Index(trimmed, "//"); idx != -1 {
-				isComment = true
-				commentText = trimmed[idx+2:]
-			} else if idx := strings.Index(trimmed, "#"); idx != -1 {
-				isComment = true
-				commentText = trimmed[idx+1:]
-			} else if strings.HasPrefix(trimmed, "*") {
-				// Típico de bloques de comentarios /* ... */
-				isComment = true
-				commentText = trimmed[1:]
+			if ext == ".go" || ext == ".java" || ext == ".ts" || ext == ".tsx" {
+				if idx := strings.Index(trimmed, "//"); idx != -1 {
+					isComment = true
+					commentText = trimmed[idx+2:]
+				} else if strings.HasPrefix(trimmed, "*") {
+					isComment = true
+					commentText = trimmed[1:]
+				}
+			} else {
+				if idx := strings.Index(trimmed, "#"); idx != -1 {
+					isComment = true
+					commentText = trimmed[idx+1:]
+				}
 			}
 
 			if isComment && emojiRegex.MatchString(commentText) {
@@ -794,6 +815,144 @@ func (s *Store) SyncRulesFromMarkdown(ctx context.Context, mdPath string) error 
 	}
 
 	return scanner.Err()
+}
+
+// GenerateMermaidGraph consulta la base de datos de dependencias y devuelve un diagrama de arquitectura en formato Mermaid.
+func (s *Store) GenerateMermaidGraph(ctx context.Context, projectID int64) (string, error) {
+	// 1. Obtener todos los archivos del proyecto y su capa
+	type fileNode struct {
+		id      int64
+		relPath string
+		layer   string
+		lang    string
+		nodeID  string // ID sanitizado para Mermaid (ej: internal_store_sqlite_go)
+	}
+
+	rowsFiles, err := s.db.QueryContext(ctx, "SELECT id, rel_path, layer FROM source_files WHERE project_id = ?", projectID)
+	if err != nil {
+		return "", fmt.Errorf("list source files for graph: %w", err)
+	}
+	defer rowsFiles.Close()
+
+	var files []fileNode
+	for rowsFiles.Next() {
+		var f fileNode
+		if err := rowsFiles.Scan(&f.id, &f.relPath, &f.layer); err != nil {
+			return "", err
+		}
+
+		// Sanitizar relPath para que sea un identificador seguro en Mermaid
+		f.nodeID = strings.ReplaceAll(f.relPath, "/", "_")
+		f.nodeID = strings.ReplaceAll(f.nodeID, ".", "_")
+		f.nodeID = strings.ReplaceAll(f.nodeID, "-", "_")
+
+		// Inferir lenguaje
+		ext := filepath.Ext(f.relPath)
+		if ext == ".go" {
+			f.lang = "go"
+		} else if ext == ".java" {
+			f.lang = "java"
+		}
+
+		files = append(files, f)
+	}
+
+	// 2. Agrupar los archivos por capas para armar los subgrafos
+	layersMap := make(map[string][]fileNode)
+	var noLayerFiles []fileNode
+
+	for _, f := range files {
+		if f.layer != "" {
+			layersMap[f.layer] = append(layersMap[f.layer], f)
+		} else {
+			noLayerFiles = append(noLayerFiles, f)
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString("graph TD\n")
+
+	// 3. Escribir subgrafos para cada capa
+	for layerName, layerFiles := range layersMap {
+		sb.WriteString(fmt.Sprintf("    subgraph %s [%s]\n", layerName, strings.Title(layerName)))
+		for _, lf := range layerFiles {
+			sb.WriteString(fmt.Sprintf("        %s[\"%s\"]\n", lf.nodeID, filepath.Base(lf.relPath)))
+		}
+		sb.WriteString("    end\n")
+	}
+
+	// Escribir los archivos sin capa en un subgrafo general o sueltos
+	if len(noLayerFiles) > 0 {
+		sb.WriteString("    subgraph sin_capa [Otros Archivos]\n")
+		for _, nlf := range noLayerFiles {
+			sb.WriteString(fmt.Sprintf("        %s[\"%s\"]\n", nlf.nodeID, filepath.Base(nlf.relPath)))
+		}
+		sb.WriteString("    end\n")
+	}
+
+	// 4. Mapear las relaciones de importación
+	type importNode struct {
+		name string
+	}
+	for _, f := range files {
+		rowsImports, err := s.db.QueryContext(ctx, "SELECT name FROM ast_nodes WHERE file_id = ? AND node_type = 'import'", f.id)
+		if err != nil {
+			continue
+		}
+
+		var imports []importNode
+		for rowsImports.Next() {
+			var imp importNode
+			if err := rowsImports.Scan(&imp.name); err == nil {
+				imports = append(imports, imp)
+			}
+		}
+		rowsImports.Close()
+
+		// Cruzar los imports del archivo actual con los demás archivos del proyecto
+		for _, imp := range imports {
+			for _, otherF := range files {
+				if otherF.id == f.id {
+					continue
+				}
+
+				matched := false
+
+				if f.lang == "go" && otherF.lang == "go" {
+					dir := filepath.Dir(otherF.relPath)
+					if dir != "." && dir != "/" && strings.HasSuffix(imp.name, dir) {
+						matched = true
+					}
+				} else if f.lang == "java" && otherF.lang == "java" {
+					javaIdx := strings.Index(otherF.relPath, "/java/")
+					if javaIdx != -1 {
+						classPath := otherF.relPath[javaIdx+6:]
+						classPath = strings.TrimSuffix(classPath, ".java")
+						classPath = strings.ReplaceAll(classPath, "/", ".")
+						pkgPath := classPath
+						lastDot := strings.LastIndex(classPath, ".")
+						if lastDot != -1 {
+							pkgPath = classPath[:lastDot]
+						}
+
+						cleanImp := strings.TrimPrefix(imp.name, "import ")
+						cleanImp = strings.TrimSuffix(cleanImp, ";")
+						cleanImp = strings.TrimSpace(cleanImp)
+
+						if cleanImp == classPath || cleanImp == pkgPath+".*" {
+							matched = true
+						}
+					}
+				}
+
+				if matched {
+					sb.WriteString(fmt.Sprintf("    %s --> %s\n", f.nodeID, otherF.nodeID))
+				}
+			}
+		}
+	}
+
+	return sb.String(), nil
 }
 
 // ---------------------------------------------------------------------------
